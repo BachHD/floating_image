@@ -66,6 +66,12 @@ public class FloatingImageService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
+        String endCommand = intent.getStringExtra("Command");
+        if (endCommand != null && endCommand.equals("end_service")){
+            stopSelf();
+            return START_STICKY;
+        }
+
         String newImagePath = intent.getStringExtra("ImagePath");
 
         if (newImagePath != null){
@@ -271,6 +277,17 @@ public class FloatingImageService extends Service {
                 mFloatingViewCfg.setVisibility(View.GONE);
             }
         });
+
+        cfgChooseBtn.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                Intent intent = new Intent(FloatingImageService.this, MainActivity.class);
+                intent.putExtra("Command", "pick_image");
+                startActivity(intent);
+                return true;
+            }
+        });
+
 
         cfgCloseBtn.setOnClickListener(new View.OnClickListener() {
             @Override

@@ -39,6 +39,15 @@ public class MainActivity extends AppCompatActivity {
         drawOverPermissionGranted = requestDrawOverPermission();
         externalStoragePermissionGranted = requestExternalStoragePermission();
 
+
+        Intent intent = getIntent();
+        String cmd = intent.getStringExtra("Command");
+
+        if (cmd != null && cmd.equals("pick_image")){
+            startPickImage();
+        }
+
+
         if (externalStoragePermissionGranted && drawOverPermissionGranted){
             initializeView();
         }
@@ -48,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
      * Set and initialize the view elements.
      */
     private void initializeView() {
-        findViewById(R.id.notify_me).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.start_btn).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Intent serviceIntent = new Intent(MainActivity.this, FloatingImageService.class);
@@ -57,15 +66,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        findViewById(R.id.pick_image).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.pick_image_btn).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent intent = new Intent();
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                // Set your required file type
-                intent.setType("image/*");
-                intent.setAction(Intent.ACTION_GET_CONTENT);
-                startActivityForResult(Intent.createChooser(intent, "DEMO"),CODE_GET_IMAGE);
+                startPickImage();
             }
         });
     }
@@ -125,6 +129,7 @@ public class MainActivity extends AppCompatActivity {
                 Intent serviceIntent = new Intent(MainActivity.this, FloatingImageService.class);
                 serviceIntent.putExtra("ImagePath", file_path);
                 startService(serviceIntent);
+                finish();
             }
 
         }
@@ -145,6 +150,14 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
         }
+    }
+
+    private void startPickImage(){
+        Intent intent = new Intent();
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        startActivityForResult(Intent.createChooser(intent, "Pick Image"),CODE_GET_IMAGE);
     }
 
     private String getRealPathFromURI(Uri contentURI) {
