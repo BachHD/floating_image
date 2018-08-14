@@ -33,9 +33,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
         drawOverPermissionGranted = requestDrawOverPermission();
         externalStoragePermissionGranted = requestExternalStoragePermission();
 
@@ -47,6 +44,9 @@ public class MainActivity extends AppCompatActivity {
             startPickImage();
         }
 
+
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
 
         if (externalStoragePermissionGranted && drawOverPermissionGranted){
             initializeView();
@@ -62,7 +62,6 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 Intent serviceIntent = new Intent(MainActivity.this, FloatingImageService.class);
                 startService(serviceIntent);
-                finish();
             }
         });
 
@@ -70,6 +69,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 startPickImage();
+            }
+        });
+
+        findViewById(R.id.unlock_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                unlockImage();
             }
         });
     }
@@ -113,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();
 
                 drawOverPermissionGranted = false;
-                finish();
+                //finish();
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
@@ -158,6 +164,12 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/*");
         intent.setAction(Intent.ACTION_GET_CONTENT);
         startActivityForResult(Intent.createChooser(intent, "Pick Image"),CODE_GET_IMAGE);
+    }
+
+    private void unlockImage(){
+        Intent serviceIntent = new Intent(MainActivity.this, FloatingImageService.class);
+        serviceIntent.putExtra("Command", "unlock_image");
+        startService(serviceIntent);
     }
 
     private String getRealPathFromURI(Uri contentURI) {

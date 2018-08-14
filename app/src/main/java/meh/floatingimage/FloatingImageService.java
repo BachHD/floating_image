@@ -25,6 +25,8 @@ import android.widget.SeekBar;
 
 import java.io.File;
 
+import static java.lang.Math.abs;
+
 
 public class FloatingImageService extends Service {
     private WindowManager mWindowManager;
@@ -33,6 +35,12 @@ public class FloatingImageService extends Service {
     private View mFloatingView;
     private View mFloatingViewMax;
     private View mFloatingViewCfg;
+
+    private final WindowManager.LayoutParams paramsMini = new WindowManager.LayoutParams();
+    private final WindowManager.LayoutParams paramsMax = new WindowManager.LayoutParams();
+    private final WindowManager.LayoutParams paramsCfg = new WindowManager.LayoutParams();
+
+    private float movedDistance;
 
     private String PREFERENCE_NAME = "FLOATING_IMAGE_PREFERENCE";
     private SharedPreferences preferences;
@@ -67,8 +75,13 @@ public class FloatingImageService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         String endCommand = intent.getStringExtra("Command");
-        if (endCommand != null && endCommand.equals("end_service")){
-            stopSelf();
+        if (endCommand != null){
+            if ( endCommand.equals("end_service")){
+                stopSelf();
+            } else if (endCommand.equals("unlock_image")){
+                paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                mWindowManager.updateViewLayout(mFloatingView, paramsMini);
+            }
             return START_STICKY;
         }
 
@@ -121,20 +134,19 @@ public class FloatingImageService extends Service {
 
     private void handleMiniView(){
         //Prepare param for small view.
-        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                currentSize,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
+        paramsMini.width    = currentSize;
+        paramsMini.height   = WindowManager.LayoutParams.WRAP_CONTENT;
+        paramsMini.type     = WindowManager.LayoutParams.TYPE_PHONE;
+        paramsMini.flags    = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        paramsMini.format   = PixelFormat.TRANSLUCENT;
 
         //Specify the view position
-        params.gravity = Gravity.TOP | Gravity.START;        //Initially view will be added to top-left corner
-        params.x = currentImageX;
-        params.y = currentImageY;
+        paramsMini.gravity = Gravity.TOP | Gravity.START;        //Initially view will be added to top-left corner
+        paramsMini.x = currentImageX;
+        paramsMini.y = currentImageY;
 
         //Add the view to the window
-        mWindowManager.addView(mFloatingView, params);
+        mWindowManager.addView(mFloatingView, paramsMini);
 
         //Drag and move floating view using user's touch action.
         mFloatingView.findViewById(R.id.image_small).setOnTouchListener(new View.OnTouchListener() {
@@ -142,22 +154,18 @@ public class FloatingImageService extends Service {
             private int initialY;
             private float initialTouchX;
             private float initialTouchY;
-            private float currentTouchX;
-            private float currentTouchY;
 
             private float startTime;
             private float endTime;
 
-            private CountDownTimer longHoldTimer = new CountDownTimer(500, 1000) {
+            private CountDownTimer longHoldTimer = new CountDownTimer(400, 1000) {
                 @Override
                 public void onTick(long l) {
                 }
 
                 @Override
                 public void onFinish() {
-                    int Xdiff = (int) (currentTouchX - initialTouchX);
-                    int Ydiff = (int) (currentTouchY - initialTouchY);
-                    if (Xdiff < 10 && Ydiff < 10){
+                    if (movedDistance < 20){
                         mFloatingViewCfg.setVisibility(View.VISIBLE);
                     }
                 }
@@ -168,9 +176,11 @@ public class FloatingImageService extends Service {
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
+                        movedDistance = 0;
+
                         //remember the initial position.
-                        initialX = params.x;
-                        initialY = params.y;
+                        initialX = paramsMini.x;
+                        initialY = paramsMini.y;
 
                         //get the touch location
                         initialTouchX = event.getRawX();
@@ -183,13 +193,10 @@ public class FloatingImageService extends Service {
                         return true;
 
                     case MotionEvent.ACTION_UP:
-                        int Xdiff = (int) (event.getRawX() - initialTouchX);
-                        int Ydiff = (int) (event.getRawY() - initialTouchY);
-
                         endTime = event.getEventTime();
                         longHoldTimer.cancel();
 
-                        if ((Xdiff < 10 && Ydiff < 10) && (endTime - startTime < 100)){
+                        if (movedDistance < 20 && (endTime - startTime < 100)){
                             mFloatingView.setVisibility(View.GONE);
                             mFloatingViewMax.setVisibility(View.VISIBLE);
                             v.performClick();
@@ -198,18 +205,20 @@ public class FloatingImageService extends Service {
 
                     case MotionEvent.ACTION_MOVE:
                         //get the touch location
-                        currentTouchX = event.getRawX();
-                        currentTouchY = event.getRawY();
+                        int Xdiff = (int) (event.getRawX() - initialTouchX);
+                        int Ydiff = (int) (event.getRawY() - initialTouchY);
+
+                        movedDistance = Math.abs(Xdiff) + Math.abs(Ydiff);
 
                         //Calculate the X and Y coordinates of the view.
-                        currentImageX = initialX + (int) (currentTouchX - initialTouchX);
-                        currentImageY = initialY + (int) (currentTouchY - initialTouchY);
+                        currentImageX = initialX + Xdiff;
+                        currentImageY = initialY + Ydiff;
 
-                        params.x = currentImageX;
-                        params.y = currentImageY;
+                        paramsMini.x = currentImageX;
+                        paramsMini.y = currentImageY;
 
                         //Update the layout with new X & Y coordinate
-                        mWindowManager.updateViewLayout(mFloatingView, params);
+                        mWindowManager.updateViewLayout(mFloatingView, paramsMini);
                         return true;
                 }
                 return false;
@@ -218,12 +227,11 @@ public class FloatingImageService extends Service {
     }
 
     private void handleMaxView(){
-        final WindowManager.LayoutParams paramsMax = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
+        paramsMax.width    = WindowManager.LayoutParams.MATCH_PARENT;
+        paramsMax.height   = WindowManager.LayoutParams.WRAP_CONTENT;
+        paramsMax.type     = WindowManager.LayoutParams.TYPE_PHONE;
+        paramsMax.flags    = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        paramsMax.format   = PixelFormat.TRANSLUCENT;
 
         //Add the view to the window
         mWindowManager.addView(mFloatingViewMax, paramsMax);
@@ -239,13 +247,11 @@ public class FloatingImageService extends Service {
     }
 
     private void handleCfgView(){
-        final WindowManager.LayoutParams paramsCfg = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                screenSize.y/4,
-                WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
-
+        paramsCfg.width    = WindowManager.LayoutParams.MATCH_PARENT;
+        paramsCfg.height   = screenSize.y/4;
+        paramsCfg.type     = WindowManager.LayoutParams.TYPE_PHONE;
+        paramsCfg.flags    = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        paramsCfg.format   = PixelFormat.TRANSLUCENT;
         paramsCfg.gravity = Gravity.BOTTOM;
 
         //Add the view to the window
@@ -254,6 +260,7 @@ public class FloatingImageService extends Service {
 
         //Get cfg GUI element
         ImageButton cfgChooseBtn = mFloatingViewCfg.findViewById(R.id.cfg_choose_btn);
+        ImageButton cfgLockBtn = mFloatingViewCfg.findViewById(R.id.cfg_lock_btn);
         ImageButton cfgCloseBtn = mFloatingViewCfg.findViewById(R.id.cfg_close_btn);
 
         final SeekBar cfgSizeBar = mFloatingViewCfg.findViewById(R.id.cfg_size_bar);
@@ -284,6 +291,26 @@ public class FloatingImageService extends Service {
                 Intent intent = new Intent(FloatingImageService.this, MainActivity.class);
                 intent.putExtra("Command", "pick_image");
                 startActivity(intent);
+                return true;
+            }
+        });
+
+
+        cfgLockBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                    | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+                mWindowManager.updateViewLayout(mFloatingView, paramsMini);
+            }
+        });
+
+
+        cfgLockBtn.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                mWindowManager.updateViewLayout(mFloatingView, paramsMini);
                 return true;
             }
         });

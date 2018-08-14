@@ -27,6 +27,13 @@
                 android:src="@android:drawable/stat_notify_sdcard" />
 
             <ImageButton
+                android:id="@+id/cfg_lock_btn"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:src="@android:drawable/ic_lock_idle_lock" />
+
+            <ImageButton
                 android:id="@+id/cfg_close_btn"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
