@@ -49,6 +49,7 @@ public class FloatingImageService extends Service {
     private String imagePath;
     private float currentAlpha;
     private int currentSize;
+    private boolean isLocked;
 
 
     public FloatingImageService() {
@@ -81,6 +82,7 @@ public class FloatingImageService extends Service {
             } else if (endCommand.equals("unlock_image")){
                 paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
                 mWindowManager.updateViewLayout(mFloatingView, paramsMini);
+                isLocked = false;
             }
             return START_STICKY;
         }
@@ -137,8 +139,15 @@ public class FloatingImageService extends Service {
         paramsMini.width    = currentSize;
         paramsMini.height   = WindowManager.LayoutParams.WRAP_CONTENT;
         paramsMini.type     = WindowManager.LayoutParams.TYPE_PHONE;
-        paramsMini.flags    = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+
         paramsMini.format   = PixelFormat.TRANSLUCENT;
+
+        if (isLocked){
+            paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                    | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        } else {
+            paramsMini.flags    = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        }
 
         //Specify the view position
         paramsMini.gravity = Gravity.TOP | Gravity.START;        //Initially view will be added to top-left corner
@@ -211,8 +220,8 @@ public class FloatingImageService extends Service {
                         movedDistance = Math.abs(Xdiff) + Math.abs(Ydiff);
 
                         //Calculate the X and Y coordinates of the view.
-                        currentImageX = initialX + Xdiff;
-                        currentImageY = initialY + Ydiff;
+                        currentImageX = Math.min(Math.max(initialX + Xdiff, 0), screenSize.x - currentSize);
+                        currentImageY = Math.min(Math.max(initialY + Ydiff, 0), screenSize.y - currentSize);
 
                         paramsMini.x = currentImageX;
                         paramsMini.y = currentImageY;
@@ -302,6 +311,7 @@ public class FloatingImageService extends Service {
                 paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                                     | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
                 mWindowManager.updateViewLayout(mFloatingView, paramsMini);
+                isLocked = true;
             }
         });
 
@@ -311,6 +321,7 @@ public class FloatingImageService extends Service {
             public boolean onLongClick(View view) {
                 paramsMini.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
                 mWindowManager.updateViewLayout(mFloatingView, paramsMini);
+                isLocked = false;
                 return true;
             }
         });
@@ -383,6 +394,7 @@ public class FloatingImageService extends Service {
         imagePath = preferences.getString("imageUri", "");
         currentAlpha = preferences.getFloat("alpha", 1);
         currentSize = preferences.getInt("size", screenSize.x/3);
+        isLocked = preferences.getBoolean("isLocked", false);
     }
 
 
@@ -393,6 +405,7 @@ public class FloatingImageService extends Service {
         editor.putString("imageUri", imagePath);
         editor.putFloat("alpha", currentAlpha);
         editor.putInt("size", currentSize);
+        editor.putBoolean("isLocked", isLocked);
         editor.apply();
     }
 
