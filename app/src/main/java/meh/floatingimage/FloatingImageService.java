@@ -264,6 +264,8 @@ public class FloatingImageService extends Service {
         });
     }
 
+    //TODO: Move Max view to an activity
+    //TODO: Add get palate function
     @SuppressLint("ClickableViewAccessibility")
     private void handleMaxView(){
         paramsMax.width    = WindowManager.LayoutParams.MATCH_PARENT;
@@ -275,12 +277,12 @@ public class FloatingImageService extends Service {
         //Add the view to the window
         mWindowManager.addView(mFloatingViewMax, paramsMax);
 
-
-        mImageViewMax.setOnClickListener(new View.OnClickListener() {
+        mImageViewMax.setOnDoubleTapListener(new ExtendedImageView.OnDoubleTapListener() {
             @Override
-            public void onClick(View view) {
+            public boolean onDoubleTap() {
                 mFloatingView.setVisibility(View.VISIBLE);
                 mFloatingViewMax.setVisibility(View.GONE);
+                return true;
             }
         });
     }
