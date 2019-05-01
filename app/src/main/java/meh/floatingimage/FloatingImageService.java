@@ -1,17 +1,28 @@
 package meh.floatingimage;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 
 import android.content.SharedPreferences;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.CountDownTimer;
 import android.os.IBinder;
 
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,16 +36,21 @@ import android.widget.SeekBar;
 
 import java.io.File;
 
-import static java.lang.Math.abs;
-
 
 public class FloatingImageService extends Service {
+    private Context mContext = this;
     private WindowManager mWindowManager;
     private Point screenSize = new Point();
 
     private View mFloatingView;
     private View mFloatingViewMax;
     private View mFloatingViewCfg;
+
+    private ImageView mImageView;
+    private ExtendedImageView mImageViewMax;
+
+    private BitmapDrawable mSourceImage;
+    private Matrix mTransformMatrix = new Matrix();
 
     private final WindowManager.LayoutParams paramsMini = new WindowManager.LayoutParams();
     private final WindowManager.LayoutParams paramsMax = new WindowManager.LayoutParams();
@@ -89,16 +105,20 @@ public class FloatingImageService extends Service {
 
         String newImagePath = intent.getStringExtra("ImagePath");
 
+        //Set image
         if (newImagePath != null){
             imagePath = newImagePath;
+            //mSourceImage = BitmapFactory.decodeFile(imagePath);
+            mSourceImage = new BitmapDrawable(getResources(), BitmapFactory.decodeFile(imagePath));
+        }
+        else{
+            //mSourceImage = BitmapFactory.decodeResource(getResources(), R.drawable.test_img);
         }
 
-        Uri imageUri = Uri.parse(new File(imagePath).toString());
-        ImageView img = mFloatingView.findViewById(R.id.image_small);
-        ImageView imgMax = mFloatingViewMax.findViewById(R.id.image_max);
+        mImageView.setImageDrawable(mSourceImage);
+        mImageViewMax.setImageDrawable(mSourceImage);
 
-        img.setImageURI(imageUri);
-        imgMax.setImageURI(imageUri);
+
 
         return START_STICKY;
     }
@@ -116,24 +136,32 @@ public class FloatingImageService extends Service {
         mFloatingViewCfg = LayoutInflater.from(this).inflate(R.layout.floating_image_config, null);
         mFloatingViewCfg.setVisibility(View.GONE);
 
+        mImageView = mFloatingView.findViewById(R.id.image_small);
+        mImageViewMax = mFloatingViewMax.findViewById(R.id.image_max);
+
         loadSetting();
 
         mFloatingView.setAlpha(currentAlpha);
 
+        //Set image
         if (imagePath.length() > 0){
-            Uri imageUri = Uri.parse(new File(imagePath).toString());
-            ImageView img = mFloatingView.findViewById(R.id.image_small);
-            ImageView imgMax = mFloatingViewMax.findViewById(R.id.image_max);
-
-            img.setImageURI(imageUri);
-            imgMax.setImageURI(imageUri);
+            //mSourceImage = BitmapFactory.decodeFile(imagePath);
+            mSourceImage = new BitmapDrawable(getResources(), BitmapFactory.decodeFile(imagePath));
         }
+        else{
+            //mSourceImage = BitmapFactory.decodeResource(getResources(), R.drawable.test_img);
+            //TODO: deal with default image
+        }
+
+        mImageView.setImageDrawable(mSourceImage);
+        mImageViewMax.setImageDrawable(mSourceImage);
 
         handleMiniView();
         handleMaxView();
         handleCfgView();
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void handleMiniView(){
         //Prepare param for small view.
         paramsMini.width    = currentSize;
@@ -158,7 +186,7 @@ public class FloatingImageService extends Service {
         mWindowManager.addView(mFloatingView, paramsMini);
 
         //Drag and move floating view using user's touch action.
-        mFloatingView.findViewById(R.id.image_small).setOnTouchListener(new View.OnTouchListener() {
+        mImageView.setOnTouchListener(new View.OnTouchListener() {
             private int initialX;
             private int initialY;
             private float initialTouchX;
@@ -179,7 +207,6 @@ public class FloatingImageService extends Service {
                     }
                 }
             };
-
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -208,6 +235,7 @@ public class FloatingImageService extends Service {
                         if (movedDistance < 20 && (endTime - startTime < 100)){
                             mFloatingView.setVisibility(View.GONE);
                             mFloatingViewMax.setVisibility(View.VISIBLE);
+
                             v.performClick();
                         }
                         return true;
@@ -217,6 +245,7 @@ public class FloatingImageService extends Service {
                         int Xdiff = (int) (event.getRawX() - initialTouchX);
                         int Ydiff = (int) (event.getRawY() - initialTouchY);
 
+                        //Simple approximation
                         movedDistance = Math.abs(Xdiff) + Math.abs(Ydiff);
 
                         //Calculate the X and Y coordinates of the view.
@@ -235,9 +264,10 @@ public class FloatingImageService extends Service {
         });
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void handleMaxView(){
         paramsMax.width    = WindowManager.LayoutParams.MATCH_PARENT;
-        paramsMax.height   = WindowManager.LayoutParams.WRAP_CONTENT;
+        paramsMax.height   = WindowManager.LayoutParams.MATCH_PARENT;
         paramsMax.type     = WindowManager.LayoutParams.TYPE_PHONE;
         paramsMax.flags    = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         paramsMax.format   = PixelFormat.TRANSLUCENT;
@@ -245,8 +275,8 @@ public class FloatingImageService extends Service {
         //Add the view to the window
         mWindowManager.addView(mFloatingViewMax, paramsMax);
 
-        ImageView imageMaximize = mFloatingViewMax.findViewById(R.id.image_max);
-        imageMaximize.setOnClickListener(new View.OnClickListener() {
+
+        mImageViewMax.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 mFloatingView.setVisibility(View.VISIBLE);
@@ -387,7 +417,6 @@ public class FloatingImageService extends Service {
         });
     }
 
-
     private void loadSetting(){
         currentImageX = preferences.getInt("x", 400);
         currentImageY = preferences.getInt("y", 100);
@@ -396,7 +425,6 @@ public class FloatingImageService extends Service {
         currentSize = preferences.getInt("size", screenSize.x/3);
         isLocked = preferences.getBoolean("isLocked", false);
     }
-
 
     private void saveSetting(){
         SharedPreferences.Editor editor = preferences.edit();
